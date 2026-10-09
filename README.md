@@ -22,7 +22,7 @@ The rules: pure functions with their inputs as parameters (no `process.env`, no 
 ```
 
 - Locally: `export NODE_AUTH_TOKEN=$(gh auth token)` after `gh auth refresh -h github.com -s read:packages`.
-- CI: `permissions: packages: read` and `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`; the repository needs read access in each package's settings (**Manage Actions access**).
+- CI: `permissions: packages: read` and `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. The packages are public, so no repository needs a grant — but GitHub Packages asks for a token even for public packages.
 - `pnpm-workspace.yaml`: add `'@abbasalsbihawi/*'` to `minimumReleaseAgeExclude`, or a release waits a day.
 
 ## Releasing

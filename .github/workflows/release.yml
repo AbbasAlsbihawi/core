@@ -1,6 +1,6 @@
 # Push a tag vX.Y.Z on main → both packages are published to GitHub Packages (npm.pkg.github.com).
-# GITHUB_TOKEN publishes; repositories that install them get read access in each package's
-# settings ("Manage Actions access") and use their own GITHUB_TOKEN.
+# GITHUB_TOKEN publishes. The packages are public: any repository installs them with its own
+# GITHUB_TOKEN (GitHub Packages still asks for a token).
 name: release
 
 on:
