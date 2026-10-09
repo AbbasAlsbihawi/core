@@ -1,0 +1,32 @@
+{
+  "name": "core-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": "^24.15.0 || ^26"
+  },
+  "scripts": {
+    "build": "pnpm --filter @abbasalsbihawi/core build",
+    "typecheck": "tsc -p packages/core/tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier . --write --cache",
+    "format:check": "prettier . --check --cache",
+    "test": "vitest run",
+    "check:release": "node scripts/check-release.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:release"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.1",
+    "culori": "4.0.2",
+    "eslint": "10.12.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3",
+    "zod": "4.6.5"
+  }
+}

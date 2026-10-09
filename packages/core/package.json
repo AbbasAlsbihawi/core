@@ -1,0 +1,61 @@
+{
+  "name": "@abbasalsbihawi/core",
+  "version": "1.0.0",
+  "description": "Runtime building blocks shared by template-admin and template-public: CSP builders, request guards, i18n helpers and the OKLCH brand ladder.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./csp": {
+      "types": "./dist/csp.d.ts",
+      "default": "./dist/csp.js"
+    },
+    "./csp-report": {
+      "types": "./dist/csp-report.d.ts",
+      "default": "./dist/csp-report.js"
+    },
+    "./read-body": {
+      "types": "./dist/read-body.d.ts",
+      "default": "./dist/read-body.js"
+    },
+    "./origin": {
+      "types": "./dist/origin.d.ts",
+      "default": "./dist/origin.js"
+    },
+    "./document-nonce": {
+      "types": "./dist/document-nonce.d.ts",
+      "default": "./dist/document-nonce.js"
+    },
+    "./i18n": {
+      "types": "./dist/i18n.d.ts",
+      "default": "./dist/i18n.js"
+    },
+    "./brand": {
+      "types": "./dist/brand.d.ts",
+      "default": "./dist/brand.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbbasAlsbihawi/core.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

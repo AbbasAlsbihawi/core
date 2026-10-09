@@ -1,0 +1,19 @@
+# pnpm 12 — unknown keys fail the command. Supply-chain rules as in template-admin.
+packages:
+  - packages/*
+minimumReleaseAge: 1440 # minutes; an explicit value makes minimumReleaseAgeStrict = true
+minimumReleaseAgeExclude: # framework security patches land the same day
+  - next
+  - '@next/*'
+  - react
+  - react-dom
+trustPolicy: no-downgrade # fail if a package loses provenance
+trustPolicyIgnoreAfter: 43200 # old pre-provenance releases do not block installs
+blockExoticSubdeps: true
+strictDepBuilds: true
+savePrefix: '' # exact versions
+allowBuilds: # prebuilt binaries; no postinstall
+  sharp: false
+  unrs-resolver: false
+  '@swc/core': false # pulled in by next-intl 4.14.9 (message extractor)
+  '@parcel/watcher': false # pulled in by next-intl 4.14.9 (message extractor)
