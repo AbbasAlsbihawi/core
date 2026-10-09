@@ -27,7 +27,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # What apps ship: @abbasalsbihawi/core has no dependencies, and this must stay clean.
+      - run: pnpm --filter @abbasalsbihawi/core audit --prod --audit-level=high
+      # Lint-time tooling (the ESLint plugins @abbasalsbihawi/config depends on): reported, not
+      # blocking. Apps install it as a devDependency and audit --prod, as template-admin 1.x did with
+      # the same plugins (eslint-plugin-boundaries pins handlebars 4.7.9, micromatch pulls braces).
       - run: pnpm audit --prod --audit-level=high
+        continue-on-error: true
       - run: pnpm check # format, lint, typecheck, test, build, versions
       # what would be published: no tests, no sources outside dist/, every export present
       - run: pnpm -r pack --pack-destination "$RUNNER_TEMP" && ls -la "$RUNNER_TEMP"/*.tgz
