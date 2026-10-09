@@ -1,7 +1,7 @@
 {
   "name": "@abbasalsbihawi/core",
-  "version": "1.0.0",
-  "description": "Runtime building blocks shared by template-admin and template-public: CSP builders, request guards, i18n helpers and the OKLCH brand ladder.",
+  "version": "1.1.0",
+  "description": "Runtime building blocks shared by template-admin and template-public: CSP builders, request guards, the NestJS envelope, the BFF and its session cookies, i18n helpers and the OKLCH brand ladder.",
   "license": "UNLICENSED",
   "type": "module",
   "sideEffects": false,
@@ -21,6 +21,22 @@
     "./origin": {
       "types": "./dist/origin.d.ts",
       "default": "./dist/origin.js"
+    },
+    "./envelope": {
+      "types": "./dist/envelope.d.ts",
+      "default": "./dist/envelope.js"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "default": "./dist/session.js"
+    },
+    "./bff": {
+      "types": "./dist/bff.d.ts",
+      "default": "./dist/bff.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
     },
     "./document-nonce": {
       "types": "./dist/document-nonce.d.ts",

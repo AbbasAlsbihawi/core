@@ -4,6 +4,19 @@ Changes to `@abbasalsbihawi/core` and `@abbasalsbihawi/config`, newest first. Bo
 
 **Projects** says what a project does to take the release in. **Major**: a project must change its own code. **Minor**: something new it may use. **Patch**: a fix it should take.
 
+## 1.1.0 — 2026-10-10
+
+The BFF and its session, moved out of template-admin 2.0.0 so template-public can sign customers in with the same code.
+
+- `@abbasalsbihawi/core`
+  - `/envelope`: `envelope`, `unwrap`, `ApiError` (`messageKey`), `parseNestError`, `toApiError` — new-structure-backend's success and error bodies, unchanged.
+  - `/session`: `tokenPairSchema`; `sessionCookies(appId)` (`__Host-<app-id>-at` / `-rt`, 14 min / 7 days); `writeSessionCookies(jar, names, pair | null | undefined)` for NextResponse#cookies, the `cookies()` jar or a plain Response (`headerCookieWriter`); `readCookie`, `serializeCookie`; `createRefresher({ apiUrl, path })` — the per-process single-flight rotation, its endpoint now an option; `resolveSession(cookies, refresh)` — active, rotated, signed out (and whether to clear) or unavailable, the one decision the proxy and the BFF share; `safeNextPath(value, locales)`.
+  - `/bff`: `createBffHandler({ apiUrl, appOrigin, cookies, refresh, allow })` — the catch-all Route Handler as a plain `Request → Response` function; `bffUpstream(segments, apiUrl, allow)`. Two changes from template-admin's route: a retry after a NestJS 401 that cannot refresh answers 503 and keeps the cookies (it used to sign the user out), and an unreachable NestJS answers 502 instead of throwing.
+  - `/http`: the `Http` interface and `createBffClient(prefix)`; a body-less call no longer sends `content-type`.
+- `@abbasalsbihawi/config`: unchanged (lockstep version).
+
+**Projects:** minor. template-admin 2.1.0 binds these modules and deletes its own copies; template-public 1.1.0 builds customer accounts on them.
+
 ## 1.0.0 — 2026-10-10
 
 Extracted from template-admin 1.0.0 (the decisions scoped **common** in its DECISIONS.md) and the storefront spike.
