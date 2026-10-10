@@ -1,6 +1,6 @@
 {
   "name": "@abbasalsbihawi/config",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Tooling presets of the templates: ESLint (architecture, RSC, a11y, RTL, i18n), Prettier, commitlint, tsconfig, and the en/ar message checker.",
   "license": "UNLICENSED",
   "type": "module",

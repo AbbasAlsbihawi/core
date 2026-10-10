@@ -4,7 +4,7 @@ Runtime building blocks of the templates. ESM with types; one entry point per mo
 
 | Import                                | Exports                                                                                                                                                                |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@abbasalsbihawi/core/csp`            | `makeNonce`, `nonceCsp(nonce, { dev, reportPath, extend })`, `staticCsp({ hashes, dev, reportPath, extend })`, `CSP_REPORT_PATH`                                       |
+| `@abbasalsbihawi/core/csp`            | `makeNonce`, `nonceCsp(nonce, { dev, reportPath, upgradeInsecureRequests, extend })`, `staticCsp({ hashes, … })`, `CSP_REPORT_PATH`                                    |
 | `@abbasalsbihawi/core/csp-report`     | `parseCspReport(body)`, `MAX_REPORTS`, `CspViolation`                                                                                                                  |
 | `@abbasalsbihawi/core/read-body`      | `readBodyCapped(request, maxBytes)`                                                                                                                                    |
 | `@abbasalsbihawi/core/origin`         | `isSameOrigin(request, appOrigin)`                                                                                                                                     |

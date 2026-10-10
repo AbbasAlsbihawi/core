@@ -4,6 +4,13 @@ Changes to `@abbasalsbihawi/core` and `@abbasalsbihawi/config`, newest first. Bo
 
 **Projects** says what a project does to take the release in. **Major**: a project must change its own code. **Minor**: something new it may use. **Patch**: a fix it should take.
 
+## 1.2.0 — 2026-10-10
+
+- `@abbasalsbihawi/core/csp`: `nonceCsp` and `staticCsp` take `upgradeInsecureRequests` (default `!dev`, so every existing header is unchanged). Turn it off on an http origin — e2e, a LAN preview: there is no https to upgrade to, and Chrome upgrades the redirects a `fetch` follows even on localhost, so a client navigation to a page behind a session gate (a 307 to sign-in) failed with `ERR_SSL_PROTOCOL_ERROR` (found by template-public's customer e2e).
+- `@abbasalsbihawi/config`: unchanged (lockstep version).
+
+**Projects:** minor. A project whose e2e runs over http with redirects followed by client navigations passes `upgradeInsecureRequests: env.APP_ORIGIN.startsWith('https:')` (template-public 1.1.0 does).
+
 ## 1.1.0 — 2026-10-10
 
 The BFF and its session, moved out of template-admin 2.0.0 so template-public can sign customers in with the same code.

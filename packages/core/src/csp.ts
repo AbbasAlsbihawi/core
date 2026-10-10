@@ -19,12 +19,18 @@ export interface CspOptions {
   dev?: boolean;
   /** Same-origin path that receives reports (report-uri + Reporting-Endpoints "csp"); null = none */
   reportPath?: string | null;
+  /**
+   * Default: !dev. Turn it off on an http origin (e2e, a LAN preview): there is no https to upgrade
+   * to, and Chrome upgrades the redirects a fetch follows even on localhost — a client navigation
+   * to a page that redirects (a session gate) then fails with ERR_SSL_PROTOCOL_ERROR.
+   */
+  upgradeInsecureRequests?: boolean;
   /** Added to the defaults (never replaces them) */
   extend?: CspDirectives;
 }
 
 // After script-src/style-src; 'default-src' always comes first (template-admin's header, unchanged).
-const rest = (dev: boolean, reportPath: string | null): Record<string, string[]> => ({
+const rest = (reportPath: string | null, upgrade: boolean): Record<string, string[]> => ({
   'img-src': ["'self'", 'blob:', 'data:'],
   'font-src': ["'self'"], // next/font self-hosts the fonts
   'connect-src': ["'self'"], // BFF only: the browser never talks to the API
@@ -33,7 +39,7 @@ const rest = (dev: boolean, reportPath: string | null): Record<string, string[]>
   'form-action': ["'self'"],
   'frame-ancestors': ["'none'"],
   ...(reportPath ? { 'report-to': ['csp'], 'report-uri': [reportPath] } : {}),
-  ...(dev ? {} : { 'upgrade-insecure-requests': [] }),
+  ...(upgrade ? { 'upgrade-insecure-requests': [] } : {}),
 });
 
 function serialize(directives: Record<string, string[]>, extend: CspDirectives = {}): string {
@@ -49,7 +55,12 @@ function serialize(directives: Record<string, string[]>, extend: CspDirectives =
 /** Per-request nonce + 'strict-dynamic'. Next nonces its own tags from the request's CSP header. */
 export function nonceCsp(
   nonce: string,
-  { dev = false, reportPath = CSP_REPORT_PATH, extend }: CspOptions = {},
+  {
+    dev = false,
+    reportPath = CSP_REPORT_PATH,
+    upgradeInsecureRequests = !dev,
+    extend,
+  }: CspOptions = {},
 ): string {
   return serialize(
     {
@@ -63,7 +74,7 @@ export function nonceCsp(
       'style-src': ["'self'", dev ? "'unsafe-inline'" : `'nonce-${nonce}'`],
       // a nonce never applies to style="" attributes (next/image, Base UI, colour swatches)
       'style-src-attr': ["'unsafe-inline'"],
-      ...rest(dev, reportPath),
+      ...rest(reportPath, upgradeInsecureRequests),
     },
     extend,
   );
@@ -83,6 +94,7 @@ export function staticCsp({
   hashes,
   dev = false,
   reportPath = CSP_REPORT_PATH,
+  upgradeInsecureRequests = !dev,
   extend,
 }: StaticCspOptions = {}): string {
   const scripts = hashes?.length ? hashes.map((h) => `'${h}'`) : ["'unsafe-inline'"];
@@ -91,7 +103,7 @@ export function staticCsp({
       'default-src': ["'self'"],
       'script-src': ["'self'", ...scripts, ...(dev ? ["'unsafe-eval'"] : [])],
       'style-src': ["'self'", "'unsafe-inline'"], // no nonce exists for prerendered styles either
-      ...rest(dev, reportPath),
+      ...rest(reportPath, upgradeInsecureRequests),
     },
     extend,
   );

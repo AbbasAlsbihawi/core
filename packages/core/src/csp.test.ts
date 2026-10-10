@@ -72,6 +72,24 @@ describe('nonceCsp options', () => {
     expect(csp.get('media-src')).toEqual(["'self'"]);
   });
 
+  it('upgradeInsecureRequests: false on an http origin, true forced even in development', () => {
+    expect(
+      directives(nonceCsp('n', { upgradeInsecureRequests: false })).has(
+        'upgrade-insecure-requests',
+      ),
+    ).toBe(false);
+    expect(
+      directives(staticCsp({ upgradeInsecureRequests: false })).has('upgrade-insecure-requests'),
+    ).toBe(false);
+    expect(
+      directives(nonceCsp('n', { dev: true, upgradeInsecureRequests: true })).has(
+        'upgrade-insecure-requests',
+      ),
+    ).toBe(true);
+    // the default keeps the header of 1.x byte for byte
+    expect(nonceCsp('n')).toBe(nonceCsp('n', { upgradeInsecureRequests: true }));
+  });
+
   it('reportPath null drops both report directives', () => {
     const csp = directives(nonceCsp('n', { reportPath: null }));
     expect(csp.has('report-to')).toBe(false);
