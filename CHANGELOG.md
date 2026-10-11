@@ -4,6 +4,13 @@ Changes to `@abbasalsbihawi/core` and `@abbasalsbihawi/config`, newest first. Bo
 
 **Projects** says what a project does to take the release in. **Major**: a project must change its own code. **Minor**: something new it may use. **Patch**: a fix it should take.
 
+## 1.2.1 — 2026-10-11
+
+- Both packages are MIT-licensed (`LICENSE` in the repository and in each package); they were `UNLICENSED`. No code change.
+- The first release published by `release.yml` through npm trusted publishing (OIDC, no token).
+
+**Projects:** patch, nothing to change: take it with the next Renovate update.
+
 ## 1.2.0 — 2026-10-10
 
 - `@abbasalsbihawi/core/csp`: `nonceCsp` and `staticCsp` take `upgradeInsecureRequests` (default `!dev`, so every existing header is unchanged). Turn it off on an http origin — e2e, a LAN preview: there is no https to upgrade to, and Chrome upgrades the redirects a `fetch` follows even on localhost, so a client navigation to a page behind a session gate (a 307 to sign-in) failed with `ERR_SSL_PROTOCOL_ERROR` (found by template-public's customer e2e).

@@ -1,8 +1,8 @@
 {
   "name": "@abbasalsbihawi/core",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Runtime building blocks shared by template-admin and template-public: CSP builders, request guards, the NestJS envelope, the BFF and its session cookies, i18n helpers and the OKLCH brand ladder.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "exports": {
