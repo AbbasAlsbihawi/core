@@ -1,6 +1,6 @@
 # core
 
-Code shared by the templates (`template-admin`, `template-public`) and the projects created from them, published as two private packages on GitHub Packages. One version for both; [CHANGELOG.md](./CHANGELOG.md) lists every release.
+Code shared by the templates (`template-admin`, `template-public`) and the projects created from them, published as two public packages on npm. One version for both; [CHANGELOG.md](./CHANGELOG.md) lists every release.
 
 | Package                                       | Install as    | What                                                                                                                                                        |
 | --------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -15,19 +15,18 @@ The rules: pure functions with their inputs as parameters (no `process.env`, no 
 
 ## Using it in a project
 
-```ini
-# .npmrc (committed): this scope comes from GitHub Packages — and no token: pnpm 12 ignores auth here
-@abbasalsbihawi:registry=https://npm.pkg.github.com
+```sh
+pnpm add @abbasalsbihawi/core
+pnpm add -D @abbasalsbihawi/config
 ```
 
-- Locally, once per machine: `gh auth refresh -h github.com -s read:packages`, then append `//npm.pkg.github.com/:_authToken=<token>` to `~/.npmrc` (`echo "//npm.pkg.github.com/:_authToken=$(gh auth token)" >> ~/.npmrc`).
-- CI: `actions/setup-node` with `registry-url: https://npm.pkg.github.com` and `scope: '@abbasalsbihawi'` (it writes a user-level .npmrc), `permissions: packages: read` and `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. The packages are public, so no repository needs a grant — but GitHub Packages asks for a token even for public packages.
+- Public on npm: a plain `pnpm install` / `npm install` / `yarn` fetches them, locally and in CI — no `.npmrc` scope line, no token.
 - `pnpm-workspace.yaml`: add `'@abbasalsbihawi/*'` to `minimumReleaseAgeExclude`, or a release waits a day.
 
 ## Releasing
 
 1. Change the code, with tests. `pnpm check` runs format, lint, typecheck, tests, build and the version check.
 2. Bump `version` in both `packages/*/package.json`, add the CHANGELOG entry (with its **Projects** line).
-3. Merge to `main`, then `git tag -a vX.Y.Z -m "core X.Y.Z" && git push origin vX.Y.Z`: `release.yml` publishes both packages.
+3. Merge to `main`, then `git tag -a vX.Y.Z -m "core X.Y.Z" && git push origin vX.Y.Z`: `release.yml` publishes both packages to npm through trusted publishing (OIDC, no token: on npmjs.com each package's **Settings → Trusted publisher** names GitHub Actions, `AbbasAlsbihawi/core`, `release.yml`).
 
 Requirements: Node 24 (`nvm use`), pnpm 12.9.1.

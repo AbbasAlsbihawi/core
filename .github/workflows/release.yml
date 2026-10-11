@@ -1,6 +1,9 @@
-# Push a tag vX.Y.Z on main → both packages are published to GitHub Packages (npm.pkg.github.com).
-# GITHUB_TOKEN publishes. The packages are public: any repository installs them with its own
-# GITHUB_TOKEN (GitHub Packages still asks for a token).
+# Push a tag vX.Y.Z on main → both packages are published to npm (registry.npmjs.org), public:
+# any project installs them with a plain pnpm/npm/yarn install, no .npmrc and no token.
+# Trusted publishing: npm trusts this workflow (each package's Settings → Trusted publisher →
+# GitHub Actions, AbbasAlsbihawi/core, release.yml) and the job proves itself with an OIDC token —
+# no NPM_TOKEN secret. npm publishes, not pnpm: npm documents OIDC from 11.5.1, and the packages
+# have no workspace: dependencies or publish scripts for pnpm to rewrite.
 name: release
 
 on:
@@ -9,7 +12,7 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write # the OIDC token npm exchanges for a one-time publish credential
 
 jobs:
   publish:
@@ -24,10 +27,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@abbasalsbihawi'
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm check # the tag must match both versions and the CHANGELOG (check-release)
-      - run: pnpm -r publish --no-git-checks --access restricted
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: npm install -g npm@11.6.2 # trusted publishing needs npm >= 11.5.1
+      - run: for p in config core; do (cd "packages/$p" && npm publish --access public) || exit 1; done

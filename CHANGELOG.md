@@ -9,6 +9,8 @@ Changes to `@abbasalsbihawi/core` and `@abbasalsbihawi/config`, newest first. Bo
 - `@abbasalsbihawi/core/csp`: `nonceCsp` and `staticCsp` take `upgradeInsecureRequests` (default `!dev`, so every existing header is unchanged). Turn it off on an http origin — e2e, a LAN preview: there is no https to upgrade to, and Chrome upgrades the redirects a `fetch` follows even on localhost, so a client navigation to a page behind a session gate (a 307 to sign-in) failed with `ERR_SSL_PROTOCOL_ERROR` (found by template-public's customer e2e).
 - `@abbasalsbihawi/config`: unchanged (lockstep version).
 
+Published on npm (`registry.npmjs.org`, public) since 2026-10-11, by hand; `release.yml` publishes the next versions there through trusted publishing. Earlier copies stay on GitHub Packages.
+
 **Projects:** minor. A project whose e2e runs over http with redirects followed by client navigations passes `upgradeInsecureRequests: env.APP_ORIGIN.startsWith('https:')` (template-public 1.1.0 does).
 
 ## 1.1.0 — 2026-10-10
