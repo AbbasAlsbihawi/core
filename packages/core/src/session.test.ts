@@ -11,6 +11,7 @@ import {
   writeSessionCookies,
   type CookieOptions,
   type RefreshResult,
+  type Refresher,
 } from './session.js';
 
 const API = 'http://127.0.0.1:4010/api/v1/';
@@ -275,5 +276,114 @@ describe('safeNextPath', () => {
     ['/en/api/health'], // internal once the locale is dropped
   ])('falls back to "/" for %j', (value) => {
     expect(safeNextPath(value, LOCALES)).toBe('/');
+  });
+});
+
+describe('createRefresher with extra headers (1.3)', () => {
+  const sent = async (forwardedFor: string | null, extra: Record<string, string>) => {
+    const fetchMock = stubFetch(() => Promise.resolve(success()));
+    await createRefresher({ apiUrl: API })('token-h-0123456789', forwardedFor, extra);
+    return new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+  };
+
+  it('sends them on the refresh call, whatever their case', async () => {
+    const headers = await sent('203.0.113.7', {
+      'X-Tracker-Site': 'site_a',
+      'x-tracker-client-ip': '203.0.113.7',
+    });
+    expect(headers.get('x-tracker-site')).toBe('site_a');
+    expect(headers.get('x-tracker-client-ip')).toBe('203.0.113.7');
+    expect(headers.get('x-forwarded-for')).toBe('203.0.113.7');
+  });
+
+  it.each([
+    ['authorization', null],
+    ['Authorization', null],
+    ['COOKIE', null],
+    ['Host', null],
+    ['content-type', 'application/json'],
+    ['Content-Type', 'application/json'],
+    ['ACCEPT', 'application/json'],
+    ['x-forwarded-for', '203.0.113.7'],
+    ['X-Forwarded-For', '203.0.113.7'],
+  ])('never sets or overrides %s through them', async (name, expected) => {
+    const headers = await sent('203.0.113.7', { [name]: 'forged', 'x-tracker-site': 'site_a' });
+    expect(headers.get(name)).toBe(expected);
+    expect(headers.get('x-tracker-site')).toBe('site_a');
+  });
+
+  it('never shares one flight between two sites, even for the same token', async () => {
+    const pending: ((res: Response) => void)[] = [];
+    const fetchMock = stubFetch(
+      () =>
+        new Promise<Response>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    const refresh = createRefresher({ apiUrl: API });
+    const token = 'token-j-0123456789';
+    const a = refresh(token, null, { 'x-tracker-site': 'site_a' });
+    const b = refresh(token, null, { 'x-tracker-site': 'site_b' });
+    const none = refresh(token, null);
+    const sameSite = refresh(token, null, { 'X-Tracker-Site': 'site_a' }); // any case: one flight
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(
+      fetchMock.mock.calls.map(([, init]) => new Headers(init?.headers).get('x-tracker-site')),
+    ).toEqual(['site_a', 'site_b', null]);
+    for (const release of pending.splice(0)) release(success());
+    const [first, second, third, fourth] = await Promise.all([a, b, none, sameSite]);
+    expect(fourth).toBe(first);
+    expect(second).not.toBe(first);
+    expect(third).not.toBe(first);
+  });
+
+  it('never sets X-Forwarded-For through them when the browser sent none', async () => {
+    const headers = await sent(null, { 'X-Forwarded-For': '10.0.0.1' });
+    expect(headers.has('x-forwarded-for')).toBe(false);
+  });
+});
+
+describe('resolveSession with extra headers (1.3)', () => {
+  it('hands them to the refresher', async () => {
+    const refresh = vi.fn<Refresher>().mockResolvedValue({ ok: true, tokens: PAIR });
+    await expect(
+      resolveSession({ refresh: 'r' }, refresh, null, { 'x-tracker-site': 'site_a' }),
+    ).resolves.toEqual({ status: 'rotated', tokens: PAIR });
+    expect(refresh.mock.calls).toEqual([['r', null, { 'x-tracker-site': 'site_a' }]]);
+  });
+
+  it('calls the refresher with the two 1.2 arguments when there are none', async () => {
+    const refresh = vi.fn<Refresher>().mockResolvedValue({ ok: true, tokens: PAIR });
+    await resolveSession({ refresh: 'r' }, refresh, '203.0.113.7');
+    expect(refresh.mock.calls[0]).toEqual(['r', '203.0.113.7']);
+    expect(refresh.mock.calls[0]).toHaveLength(2);
+  });
+});
+
+describe('1.2 call sites', () => {
+  it('compile and behave unchanged: a 1.2 refresher, a 1.2 wrapper, two- and three-argument calls', async () => {
+    const seen: [string, string | null | undefined][] = [];
+    // a refresher written against 1.2, and a wrapper of the kind apps write around createRefresher
+    const legacy = (token: string, forwardedFor?: string | null): Promise<RefreshResult> => {
+      seen.push([token, forwardedFor]);
+      return Promise.resolve({ ok: true, tokens: PAIR });
+    };
+    const wrap =
+      (inner: Refresher): Refresher =>
+      (token, forwardedFor) =>
+        inner(token, forwardedFor);
+    const refresh: Refresher = wrap(legacy);
+
+    await expect(resolveSession({ refresh: 'r' }, refresh)).resolves.toEqual({
+      status: 'rotated',
+      tokens: PAIR,
+    });
+    await resolveSession({ refresh: 'r' }, legacy, '203.0.113.7');
+    await expect(refresh('r2')).resolves.toEqual({ ok: true, tokens: PAIR });
+    expect(seen).toEqual([
+      ['r', undefined],
+      ['r', '203.0.113.7'],
+      ['r2', undefined],
+    ]);
   });
 });

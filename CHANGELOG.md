@@ -4,6 +4,17 @@ Changes to `@abbasalsbihawi/core` and `@abbasalsbihawi/config`, newest first. Bo
 
 **Projects** says what a project does to take the release in. **Major**: a project must change its own code. **Minor**: something new it may use. **Patch**: a fix it should take.
 
+## 1.3.0 — 2026-11-19
+
+One app on several hosts (the Tracker's sites): the BFF resolves its CSRF origin and its upstream headers per request.
+
+- `@abbasalsbihawi/core/bff`: `createBffHandler` takes `appOrigin` as a string (as before) or a function of the request (`string | null`, sync or async); `null`, or anything but a non-empty string, answers 403 `{ code: 'csrf' }` to every method. New `extraHeaders(req)`: headers merged into every upstream call of the request and into its refresh, asked again before each call (a signed timestamp stays fresh on a retry; a throw rejects the handler, never a 502); `authorization`, `cookie`, `host` and the forwarded headers can never be set or overridden through it, whatever their case.
+- `@abbasalsbihawi/core/session`: `Refresher` and `resolveSession` take `extraHeaders` as a last, optional argument; `createRefresher` sends them minus `authorization`, `cookie`, `host`, `content-type`, `accept` and `x-forwarded-for`. Without them the refresher is called with the same two arguments as in 1.2. A refresh is shared only between calls with the same token and the same `x-tracker-site` header.
+- `zod` peer range raised to `^4.6.6`: 4.6.5 has a high-severity advisory.
+- `@abbasalsbihawi/config`: unchanged (lockstep version).
+
+**Projects:** minor: 1.2 call sites compile and behave unchanged; a project still on zod below 4.6.6 takes 4.6.6 or later (the new peer range). tracker-web (S2-web) passes a per-host `appOrigin`, the site header and the signed client-IP headers through `extraHeaders`.
+
 ## 1.2.1 — 2026-10-11
 
 - Both packages are MIT-licensed (`LICENSE` in the repository and in each package); they were `UNLICENSED`. No code change.

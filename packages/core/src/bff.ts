@@ -48,16 +48,44 @@ const FORWARD_RESPONSE = [
   'x-request-id',
 ] as const;
 const NULL_BODY = new Set([204, 205, 304]);
+/** What the handler sets itself (auth, forwarding) or never passes: extra headers cannot touch it. */
+const RESERVED: ReadonlySet<string> = new Set([
+  'authorization',
+  'cookie',
+  'host',
+  ...FORWARD_REQUEST,
+]);
 
 export interface BffOptions {
   apiUrl: string;
-  appOrigin: string;
+  /**
+   * The origin a write must come from. A function is asked on every request (one app serving
+   * several hosts); null (or anything but a non-empty string) answers 403 `{ code: 'csrf' }` to
+   * every method, reads included.
+   */
+  appOrigin: string | ((req: Request) => string | null | Promise<string | null>);
   cookies: SessionCookies;
   refresh: Refresher;
   /** Upstream prefixes the browser may reach, one per feature, e.g. `/^users(?:\/|$)/` — never auth. */
   allow: readonly RegExp[];
   maxBodyBytes?: number;
   timeoutMs?: number;
+  /**
+   * Headers for every upstream call of the request, the refresh included (a site id, a signed
+   * client IP); asked again before each call, so a signed timestamp is fresh on a retry.
+   * Authorization, cookie, host and the forwarded headers are dropped whatever their case: the
+   * handler's own values always win. A throw rejects the handler; nothing more reaches NestJS.
+   */
+  extraHeaders?: (req: Request) => Record<string, string> | Promise<Record<string, string>>;
+}
+
+/** The extra headers minus RESERVED; Headers lower-cases the names and refuses malformed ones. */
+function allowedExtra(headers: Record<string, string>): Record<string, string> {
+  const allowed: Record<string, string> = {};
+  new Headers(headers).forEach((value, name) => {
+    if (!RESERVED.has(name)) allowed[name] = value;
+  });
+  return allowed;
 }
 
 export type BffHandler = (request: Request, segments: readonly string[]) => Promise<Response>;
@@ -65,7 +93,7 @@ export type BffHandler = (request: Request, segments: readonly string[]) => Prom
 const empty = (status: number) => new Response(null, { status });
 
 export function createBffHandler(options: BffOptions): BffHandler {
-  const { apiUrl, appOrigin, cookies: names, refresh, allow } = options;
+  const { apiUrl, appOrigin, cookies: names, refresh, allow, extraHeaders } = options;
   const maxBody = options.maxBodyBytes ?? 1_000_000;
   const timeoutMs = options.timeoutMs ?? 15_000;
 
@@ -76,7 +104,11 @@ export function createBffHandler(options: BffOptions): BffHandler {
   };
 
   return async (req, segments) => {
-    if (!isSameOrigin(req, appOrigin)) return Response.json({ code: 'csrf' }, { status: 403 });
+    const origin = typeof appOrigin === 'string' ? appOrigin : await appOrigin(req);
+    // anything but a non-empty string (an untyped caller's undefined, '') counts as null
+    if (typeof origin !== 'string' || !origin || !isSameOrigin(req, origin)) {
+      return Response.json({ code: 'csrf' }, { status: 403 });
+    }
     const url = bffUpstream(segments, apiUrl, allow);
     if (!url) return empty(404);
     url.search = new URL(req.url).search;
@@ -88,13 +120,17 @@ export function createBffHandler(options: BffOptions): BffHandler {
       if (body === null) return empty(413);
     }
 
+    /** Asked before each NestJS call; a throw rejects the handler (it is not an outage). */
+    const fresh = async () => (extraHeaders ? allowedExtra(await extraHeaders(req)) : undefined);
     const cookieHeader = req.headers.get('cookie');
+    const accessCookie = readCookie(cookieHeader, names.access);
     const refreshToken = readCookie(cookieHeader, names.refresh);
     const forwardedFor = req.headers.get('x-forwarded-for');
     const session = await resolveSession(
-      { access: readCookie(cookieHeader, names.access), refresh: refreshToken },
+      { access: accessCookie, refresh: refreshToken },
       refresh,
       forwardedFor,
+      accessCookie || !refreshToken ? undefined : await fresh(), // only a rotation sends them
     );
     if (session.status === 'unavailable') return empty(503);
     if (session.status === 'signed-out') {
@@ -103,8 +139,8 @@ export function createBffHandler(options: BffOptions): BffHandler {
     let rotated = session.status === 'rotated' ? session.tokens : undefined;
     const access = session.status === 'rotated' ? session.tokens.accessToken : session.accessToken;
 
-    const call = async (token: string) => {
-      const h = new Headers();
+    const call = async (token: string, extra: Record<string, string> | undefined) => {
+      const h = new Headers(extra); // first, so nothing below can be overridden by it
       for (const name of FORWARD_REQUEST) {
         const value = req.headers.get(name);
         if (value) h.set(name, value);
@@ -119,22 +155,23 @@ export function createBffHandler(options: BffOptions): BffHandler {
         signal: AbortSignal.timeout(timeoutMs),
       });
     };
+    const rotate = async (token: string, extra: Record<string, string> | undefined) =>
+      extra ? refresh(token, forwardedFor, extra) : refresh(token, forwardedFor);
+    /** null = NestJS unreachable or too slow; only the call itself is caught, never `fresh`. */
+    const reach = <T>(work: Promise<T>) => work.catch(() => null);
 
-    let upstream: Response;
-    try {
-      upstream = await call(access);
-      if (upstream.status === 401 && refreshToken && !rotated) {
-        // the access cookie outlived its token (revoked, clock skew): rotate once and retry
-        const retry = await refresh(refreshToken, forwardedFor);
-        if (!retry.ok && retry.reason === 'unavailable') return empty(503);
-        if (retry.ok) {
-          rotated = retry.tokens;
-          upstream = await call(rotated.accessToken);
-        }
+    let upstream = await reach(call(access, await fresh()));
+    if (upstream?.status === 401 && refreshToken && !rotated) {
+      // the access cookie outlived its token (revoked, clock skew): rotate once and retry
+      const retry = await reach(rotate(refreshToken, await fresh()));
+      if (!retry) return empty(502);
+      if (!retry.ok && retry.reason === 'unavailable') return empty(503);
+      if (retry.ok) {
+        rotated = retry.tokens;
+        upstream = await reach(call(rotated.accessToken, await fresh()));
       }
-    } catch {
-      return empty(502); // NestJS unreachable or too slow
     }
+    if (!upstream) return empty(502);
     if (upstream.status === 401) return withCookies(empty(401), null);
 
     // never content-encoding/length: fetch has already decoded the body

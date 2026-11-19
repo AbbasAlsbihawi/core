@@ -120,11 +120,26 @@ export function readCookie(header: string | null, name: string): string | undefi
 export type RefreshResult =
   { ok: true; tokens: TokenPair } | { ok: false; reason: 'invalid' | 'unavailable' };
 
-/** `forwardedFor` is the browser's X-Forwarded-For: NestJS rate-limits per client, not per BFF. */
+/**
+ * `forwardedFor` is the browser's X-Forwarded-For: NestJS rate-limits per client, not per BFF.
+ * `extraHeaders` (1.3) ride on the refresh call too, e.g. a site id or a signed client IP: refresh
+ * is the one NestJS call a BFF option cannot reach on its own.
+ */
 export type Refresher = (
   refreshToken: string,
   forwardedFor?: string | null,
+  extraHeaders?: Record<string, string>,
 ) => Promise<RefreshResult>;
+
+/** What the refresh call sets itself (or never sends): extra headers cannot set or override them. */
+const REFRESH_RESERVED = new Set([
+  'authorization',
+  'cookie',
+  'host',
+  'content-type',
+  'accept',
+  'x-forwarded-for',
+]);
 
 export interface RefresherOptions {
   /** The NestJS base, ending in `/api/v1/`. */
@@ -139,7 +154,9 @@ export interface RefresherOptions {
  * prefetches, the BFF) share it. Across processes NestJS covers the rest: it serialises refreshes
  * per session and answers a token rotated less than 30 s ago with the current pair, so they all
  * converge. 400/401/403 → 'invalid' (sign in again); anything else → 'unavailable', because an
- * outage must not sign anyone out.
+ * outage must not sign anyone out. Extra headers go on the call minus REFRESH_RESERVED, matched
+ * without regard to case; calls share a flight only for the same token and x-tracker-site, and a
+ * shared call carries the headers of the request that started it.
  */
 export function createRefresher({
   apiUrl,
@@ -149,8 +166,18 @@ export function createRefresher({
   const endpoint = new URL(path, apiUrl);
   const inflight = new Map<string, Promise<RefreshResult>>();
 
-  async function call(refreshToken: string, forwardedFor?: string | null): Promise<RefreshResult> {
-    const headers = new Headers({ 'content-type': 'application/json', accept: 'application/json' });
+  async function call(
+    refreshToken: string,
+    forwardedFor?: string | null,
+    extraHeaders?: Record<string, string>,
+  ): Promise<RefreshResult> {
+    const headers = new Headers();
+    // Headers lower-cases the names (and refuses malformed ones) before the reserved check
+    new Headers(extraHeaders).forEach((value, name) => {
+      if (!REFRESH_RESERVED.has(name)) headers.set(name, value);
+    });
+    headers.set('content-type', 'application/json');
+    headers.set('accept', 'application/json');
     if (forwardedFor) headers.set('x-forwarded-for', forwardedFor);
     try {
       const res = await fetch(endpoint, {
@@ -174,14 +201,29 @@ export function createRefresher({
     }
   }
 
-  return (refreshToken, forwardedFor) => {
-    let pending = inflight.get(refreshToken);
+  return (refreshToken, forwardedFor, extraHeaders) => {
+    const key = flightKey(refreshToken, extraHeaders);
+    let pending = inflight.get(key);
     if (!pending) {
-      pending = call(refreshToken, forwardedFor).finally(() => inflight.delete(refreshToken));
-      inflight.set(refreshToken, pending);
+      pending = call(refreshToken, forwardedFor, extraHeaders).finally(() => inflight.delete(key));
+      inflight.set(key, pending);
     }
     return pending;
   };
+}
+
+/** The site header of a multi-site BFF (tracker-web): its value is part of the flight key. */
+const SITE_HEADER = 'x-tracker-site';
+
+/**
+ * Token plus site (empty when absent), so a token is never refreshed for two sites in one call.
+ * Defence in depth: refresh cookies are host-only, so one token should only ever come from one site.
+ */
+function flightKey(refreshToken: string, extraHeaders: Record<string, string> | undefined): string {
+  const site = Object.entries(extraHeaders ?? {}).find(
+    ([name]) => name.toLowerCase() === SITE_HEADER,
+  )?.[1];
+  return JSON.stringify([refreshToken, site ?? '']);
 }
 
 export type SessionState =
@@ -194,15 +236,19 @@ export type SessionState =
  * What a request's cookies are worth before NestJS sees them. The access cookie is not verified
  * here (NestJS does that on every call): present means "use it". Without it the refresh cookie is
  * rotated. `clear` = NestJS rejected the refresh cookie, so the response expires both.
+ * `extraHeaders` are handed to `refresh`; without them it is called exactly as in 1.2.
  */
 export async function resolveSession(
   cookies: { access?: string | undefined; refresh?: string | undefined },
   refresh: Refresher,
   forwardedFor?: string | null,
+  extraHeaders?: Record<string, string>,
 ): Promise<SessionState> {
   if (cookies.access) return { status: 'active', accessToken: cookies.access };
   if (!cookies.refresh) return { status: 'signed-out', clear: false };
-  const result = await refresh(cookies.refresh, forwardedFor);
+  const result = await (extraHeaders
+    ? refresh(cookies.refresh, forwardedFor, extraHeaders)
+    : refresh(cookies.refresh, forwardedFor));
   if (result.ok) return { status: 'rotated', tokens: result.tokens };
   return result.reason === 'invalid'
     ? { status: 'signed-out', clear: true }

@@ -1,6 +1,6 @@
 {
   "name": "@abbasalsbihawi/core",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Runtime building blocks shared by template-admin and template-public: CSP builders, request guards, the NestJS envelope, the BFF and its session cookies, i18n helpers and the OKLCH brand ladder.",
   "license": "MIT",
   "type": "module",
@@ -59,7 +59,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "peerDependencies": {
-    "zod": "^4.0.0"
+    "zod": "^4.6.6"
   },
   "peerDependenciesMeta": {
     "zod": {
